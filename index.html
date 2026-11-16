@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Club Budget Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: ledger-style tool. Sticky role bar, then the selected person's view: balances first, then the request register. */
+:root{
+  --bg:#f5f6f4; --surface:#ffffff; --fg:#1d2420; --muted:#5d6862; --line:#d9ded9;
+  --accent:#1f6b4f; --accent-fg:#ffffff; --accent-soft:#e3f0ea;
+  --neg:#b42318; --neg-soft:#fde8e6; --warn:#8a5a00; --warn-soft:#fff2d6;
+  --ok:#1f6b4f; --ok-soft:#e3f0ea;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141917; --surface:#1c2320; --fg:#e6ebe8; --muted:#9aa6a0; --line:#2f3934;
+  --accent:#5cc49a; --accent-fg:#0f1513; --accent-soft:#1e3a2f;
+  --neg:#ff8a7a; --neg-soft:#3d1f1c; --warn:#f2c46b; --warn-soft:#3a2e14;
+  --ok:#5cc49a; --ok-soft:#1e3a2f; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#141917; --surface:#1c2320; --fg:#e6ebe8; --muted:#9aa6a0; --line:#2f3934;
+  --accent:#5cc49a; --accent-fg:#0f1513; --accent-soft:#1e3a2f;
+  --neg:#ff8a7a; --neg-soft:#3d1f1c; --warn:#f2c46b; --warn-soft:#3a2e14;
+  --ok:#5cc49a; --ok-soft:#1e3a2f; color-scheme:dark;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;display:flex;flex-direction:column;gap:24px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar-inner{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}
+.brand{display:flex;flex-direction:column;margin-right:auto;min-width:0}
+.brand h1{font-family:var(--display);font-size:20px;margin:0;font-weight:600;letter-spacing:-.01em}
+.brand span{font-size:12px;color:var(--muted)}
+.tag{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:4px;background:var(--warn-soft);color:var(--warn);white-space:nowrap}
+label{font-size:13px;font-weight:500;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+select,input,textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-width:0}
+select:focus-visible,input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.who{flex-direction:row;align-items:center;gap:8px}
+button{font:inherit;font-weight:500;border-radius:6px;padding:7px 14px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer}
+button.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+h2{font-family:var(--display);font-size:17px;font-weight:600;margin:0}
+.section{display:flex;flex-direction:column;gap:12px}
+.section-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.club{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.club .name{font-weight:600}
+.club .booster{font-size:12px;color:var(--muted)}
+.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.club .bal{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:22px;font-weight:500;margin-top:6px}
+.club.negative{border-color:var(--neg);background:var(--neg-soft)}
+.neg{color:var(--neg)}
+.flag{font-size:12px;font-weight:600;color:var(--neg)}
+.forms{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+form.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.row{grid-template-columns:1fr}}
+.msg{font-size:13px;margin:0;min-height:1.2em}
+.msg.err{color:var(--neg)} .msg.ok{color:var(--ok)}
+.table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:860px;font-size:14px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--bg)}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.pending{background:var(--warn-soft);color:var(--warn)}
+.pill.approved{background:var(--ok-soft);color:var(--ok)}
+.pill.paid{background:var(--ok);color:var(--accent-fg)}
+.pill.returned{background:var(--warn-soft);color:var(--warn)}
+.pill.rejected{background:var(--neg-soft);color:var(--neg)}
+.pill.cancelled{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.reason{font-size:13px;margin-top:4px}
+.sigs{font-size:13px;color:var(--muted)}
+.receipt{font-family:var(--mono);font-size:12px;word-break:break-all}
+.blocked{background:var(--surface);border:1px solid var(--neg);border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:8px;max-width:640px}
+.blocked h2{color:var(--neg)}
+.blocked a{color:var(--accent);font-weight:500}
+.small{font-size:12px;color:var(--muted)}
+.cellmsg{font-size:12px;color:var(--neg);margin-top:4px}
+.cellnote{font-size:12px;color:var(--muted);margin-top:4px}
+tr.confirm-row td{background:var(--bg)}
+.confirm{background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-width:560px}
+.confirm dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:0;font-size:14px}
+.confirm dt{color:var(--muted)} .confirm dd{margin:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.warnbox{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn);border-radius:6px;padding:8px 12px;font-size:14px;font-weight:500;margin:0}
+button.small-btn{font-size:13px;padding:4px 10px;margin-top:6px}
+@media (prefers-reduced-motion:no-preference){button{transition:opacity .15s}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <h1>Club Budget Tracker</h1>
+      <span>Booster Foundation club funds &middot; Version 1.1 pilot</span>
+    </div>
+    <span class="tag">Sample data only</span>
+    <label class="who" for="who">Viewing as
+      <select id="who"></select>
+    </label>
+    <button class="ghost" id="reset" type="button">Reset sample data</button>
+  </div>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<script>
+(function(){
+  const KEY='cbt-v1';
+  const people=[
+    {id:'p1',name:'Dana Whitfield',role:'booster',club:'c1',signed:true},
+    {id:'p2',name:'Marco Ruiz',role:'booster',club:'c2',signed:true},
+    {id:'p3',name:'Priya Nair',role:'booster',club:'c3',signed:true},
+    {id:'p4',name:'Kevin O’Hara',role:'booster',club:'c4',signed:false},
+    {id:'p5',name:'Lena Park',role:'booster',club:'c5',signed:true},
+    {id:'t1',name:'Joan Ellis',role:'treasurer'},
+    {id:'t2',name:'Sam Okafor',role:'asst'},
+    {id:'b1',name:'Rita Gomez',role:'board'},
+    {id:'b2',name:'Alex Chen',role:'board'}
+  ];
+  const roleLabel={booster:'Booster parent',treasurer:'Foundation Treasurer',asst:'Foundation Assistant Treasurer',board:'Foundation Board member'};
+  const clubs=[
+    {id:'c1',name:'Robotics'},{id:'c2',name:'Girls Water Polo'},{id:'c3',name:'Marching Band'},
+    {id:'c4',name:'Model UN'},{id:'c5',name:'Track and Field'},{id:'c6',name:'Ceramics Club'}
+  ];
+  function seed(){return{
+    deposits:[
+      {id:'d1',club:'c1',date:'2026-09-08',amount:2400,desc:'Sponsor check, local engineering firm',by:'p1'},
+      {id:'d2',club:'c2',date:'2026-09-15',amount:1850,desc:'Team fees',by:'p2'},
+      {id:'d3',club:'c3',date:'2026-09-20',amount:3200,desc:'Fall fundraiser',by:'p3'},
+      {id:'d4',club:'c4',date:'2026-09-22',amount:600,desc:'Member dues',by:'t1'},
+      {id:'d5',club:'c5',date:'2026-10-01',amount:420,desc:'Bake sale',by:'p5'},
+      {id:'d6',club:'c6',date:'2026-10-03',amount:350,desc:'Pottery sale',by:'t2'}
+    ],
+    requests:[
+      {id:'r1',club:'c1',type:'Reimbursement',payee:'Dana Whitfield',amount:612.40,purpose:'Competition parts order',receipt:'parts_order_0912.pdf',preparedBy:'p1',sigs:['t1','b1'],sigAt:{t1:'2026-09-15T10:12:00',b1:'2026-09-16T09:05:00'},date:'2026-09-14'},
+      {id:'r2',club:'c3',type:'Check request',payee:'Coastline Bus Lines',amount:1450,purpose:'Bus for away football game',receipt:'bus_quote_oct.pdf',preparedBy:'p3',sigs:['t2'],sigAt:{t2:'2026-10-13T16:40:00'},date:'2026-10-12'},
+      {id:'r3',club:'c5',type:'Reimbursement',payee:'Lena Park',amount:300,purpose:'Team water and snacks, invitational meet',receipt:'costco_1102.jpg',preparedBy:'p5',sigs:['b2'],sigAt:{b2:'2026-11-03T08:22:00'},date:'2026-11-02'},
+      {id:'r4',club:'c2',type:'Reimbursement',payee:'Marco Ruiz',amount:236.18,purpose:'Senior night banners',receipt:'banners_1104.pdf',preparedBy:'p2',sigs:[],date:'2026-11-04'},
+      {id:'r5',club:'c6',type:'Check request',payee:'Pacific Clay Supply',amount:280,purpose:'Glaze and clay restock',receipt:'pacific_clay_inv_311.pdf',preparedBy:'t1',sigs:[],date:'2026-11-06'}
+    ],
+    seq:100
+  };}
+  let state;
+  try{state=JSON.parse(localStorage.getItem(KEY))}catch(e){state=null}
+  if(!state||!state.deposits)state=seed();
+  let current='t1';
+  let flash=null;
+  let confirming=null;
+  let panel=null;
+  try{current=localStorage.getItem(KEY+'-who')||'t1'}catch(e){}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+  const P=id=>people.find(p=>p.id===id);
+  const C=id=>clubs.find(c=>c.id===id);
+  const money=n=>(n<0?'−$':'$')+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const sigTime=(r,id)=>{const t=r.sigAt&&r.sigAt[id];if(!t)return '';const d=new Date(t);return isNaN(d)?'':d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}).replace(/\u202f/g,' ')};
+  const status=r=>r.state||(r.sigs.length>=2?'Approved':'Pending');
+  const canSign=p=>['treasurer','asst','board'].includes(p.role);
+  const canPrepare=p=>['treasurer','asst'].includes(p.role);
+  function balance(cid){
+    const dep=state.deposits.filter(d=>d.club===cid).reduce((a,d)=>a+d.amount,0);
+    const out=state.requests.filter(r=>r.club===cid&&(status(r)==='Approved'||status(r)==='Paid')).reduce((a,r)=>a+r.amount,0);
+    return Math.round((dep-out)*100)/100;
+  }
+  function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+
+  const who=document.getElementById('who');
+  who.innerHTML=people.map(p=>`<option value="${p.id}">${esc(p.name)} (${roleLabel[p.role]}${p.role==='booster'?', '+esc(C(p.club).name):''}${p.role==='booster'&&!p.signed?', no agreement':''})</option>`).join('');
+  who.value=current;
+  who.addEventListener('change',()=>{current=who.value;confirming=null;panel=null;try{localStorage.setItem(KEY+'-who',current)}catch(e){}render()});
+  const resetBtn=document.getElementById('reset');
+  resetBtn.addEventListener('click',()=>{
+    if(resetBtn.dataset.confirm!=='1'){resetBtn.dataset.confirm='1';resetBtn.textContent='Click again to reset';setTimeout(()=>{resetBtn.dataset.confirm='';resetBtn.textContent='Reset sample data'},3000);return}
+    state=seed();save();resetBtn.dataset.confirm='';resetBtn.textContent='Reset sample data';render();
+  });
+
+  function clubCard(c){
+    const b=balance(c.id);const booster=people.find(p=>p.role==='booster'&&p.club===c.id);
+    return `<div class="club${b<0?' negative':''}"><span class="name">${esc(c.name)}</span>
+      <span class="booster">${booster?'Booster: '+esc(booster.name)+(booster.signed?'':' (no agreement)'):'No booster parent assigned'}</span>
+      <span class="bal${b<0?' neg':''}">${money(b)}</span>${b<0?'<span class="flag">Negative balance</span>':''}</div>`;
+  }
+
+  function requestForm(me){
+    const clubSel=me.role==='booster'
+      ?`<input type="hidden" id="rq-club" value="${me.club}"><p class="hint">Club: <strong>${esc(C(me.club).name)}</strong></p>`
+      :`<label for="rq-club">Club<select id="rq-club">${clubs.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label>`;
+    return `<form class="card" id="rq-form" novalidate>
+      <h2>${me.role==='booster'?'Submit a request':'Prepare a request'}</h2>
+      ${clubSel}
+      <div class="row">
+        <label for="rq-type">Type<select id="rq-type"><option>Reimbursement</option><option>Check request</option></select></label>
+        <label for="rq-amount">Amount (USD)<input id="rq-amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"></label>
+      </div>
+      <label for="rq-payee">Pay to<input id="rq-payee" type="text" placeholder="Person or vendor"></label>
+      <label for="rq-purpose">What it is for<input id="rq-purpose" type="text" placeholder="For example: tournament entry fee"></label>
+      <label for="rq-receipt">Receipt or proof of purchase (required)<input id="rq-receipt" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic"></label>
+      <button type="submit">Submit for two signatures</button>
+      <p class="msg" id="rq-msg" role="status"></p>
+    </form>`;
+  }
+  function depositForm(me){
+    return `<form class="card" id="dp-form" novalidate>
+      <h2>Record a deposit</h2>
+      <p class="hint">Club: <strong>${esc(C(me.club).name)}</strong></p>
+      <div class="row">
+        <label for="dp-date">Date<input id="dp-date" type="date" value="${today()}"></label>
+        <label for="dp-amount">Amount (USD)<input id="dp-amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"></label>
+      </div>
+      <label for="dp-desc">Description<input id="dp-desc" type="text" placeholder="For example: car wash fundraiser"></label>
+      <button type="submit">Record deposit</button>
+      <p class="msg" id="dp-msg" role="status"></p>
+    </form>`;
+  }
+
+  function requestTable(list,me){
+    if(!list.length)return '<p class="hint">No requests yet.</p>';
+    const showActions=canSign(me)||list.some(r=>r.preparedBy===me.id);
+    const rows=list.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+      const st=status(r);
+      const mine=r.preparedBy===me.id;
+      let action='';
+      if(st==='Pending'){
+        if(canSign(me)){
+          if(mine)action='<button type="button" disabled>Sign</button><div class="cellnote">You prepared this request, so you cannot sign it.</div>';
+          else if(r.sigs.includes(me.id))action=`<div class="cellnote">${sigTime(r,me.id)?'You signed this on '+sigTime(r,me.id)+'.':'You signed this request.'}</div><button type="button" class="ghost small-btn" data-withdraw="${r.id}">Withdraw my signature</button>`;
+          else action=`<button type="button" data-sign="${r.id}">Sign</button>`;
+          if(!mine)action+=`<div class="btns"><button type="button" class="ghost small-btn" data-panel="reject:${r.id}">Reject</button><button type="button" class="ghost small-btn" data-panel="return:${r.id}">Return for correction</button></div>`;
+        }
+        if(mine)action+=`<div><button type="button" class="ghost small-btn" data-panel="cancel:${r.id}">Cancel request</button></div>`;
+      }else if(st==='Approved'){if(canPrepare(me))action=`<button type="button" class="small-btn" data-panel="paid:${r.id}">Mark as paid</button>`;else if(canSign(me))action='<span class="small">Awaiting payment</span>'}
+      else if(st==='Paid'){if(canSign(me))action='<span class="small">Paid</span>'}
+      else if(st==='Returned'&&mine)action=`<button type="button" class="small-btn" data-panel="edit:${r.id}">Edit and resubmit</button>`;
+      const after=Math.round((balance(r.club)-r.amount)*100)/100;
+      const warn=(r.sigs.length===1&&after<0)?`<p class="warnbox" role="alert">Approving this will make ${esc(C(r.club).name)}’s balance ${money(after)}.</p>`:'';
+      const confirmRow=(canSign(me)&&confirming===r.id&&st==='Pending')?`<tr class="confirm-row"><td colspan="10">
+        <div class="confirm" role="group" aria-label="Confirm signature"><strong>Confirm your signature</strong>
+          <dl><dt>Club</dt><dd>${esc(C(r.club).name)}</dd><dt>Pay to</dt><dd>${esc(r.payee)}</dd><dt>Amount</dt><dd class="amt">${money(r.amount)}</dd><dt>Purpose</dt><dd>${esc(r.purpose)}</dd></dl>
+          ${warn}<div class="btns"><button type="button" data-confirm-sign="${r.id}">Confirm signature</button><button type="button" class="ghost" data-cancel-sign>Cancel</button></div>
+        </div></td></tr>`:'';
+      const pn=(panel&&panel.id===r.id)?panel.kind:null;
+      let panelBody='';
+      if(pn==='reject'||pn==='return')panelBody=`<strong>${pn==='reject'?'Reject this request':'Return this request for correction'}</strong>
+          <p class="hint">${pn==='reject'?'Rejecting is final. The requester will see your reason.':'The requester will see your reason and can edit and resubmit the request.'}</p>
+          <label for="pn-reason">Reason (required)<textarea id="pn-reason" rows="2"></textarea></label>
+          <div class="btns"><button type="button" data-panel-go>${pn==='reject'?'Reject request':'Return for correction'}</button><button type="button" class="ghost" data-panel-close>Cancel</button></div>
+          <p class="msg" id="pn-msg" role="status"></p>`;
+      else if(pn==='cancel')panelBody=`<strong>Cancel this request?</strong>
+          <p class="hint">A cancelled request cannot be signed or resubmitted.</p>
+          <div class="btns"><button type="button" data-panel-go>Cancel request</button><button type="button" class="ghost" data-panel-close>Keep request</button></div>`;
+      else if(pn==='edit')panelBody=`<strong>Edit and resubmit</strong>
+          <div class="row">
+            <label for="pn-type">Type<select id="pn-type"><option${r.type==='Reimbursement'?' selected':''}>Reimbursement</option><option${r.type==='Check request'?' selected':''}>Check request</option></select></label>
+            <label for="pn-amount">Amount (USD)<input id="pn-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${r.amount}"></label>
+          </div>
+          <label for="pn-payee">Pay to<input id="pn-payee" type="text" value="${esc(r.payee)}"></label>
+          <label for="pn-purpose">What it is for<input id="pn-purpose" type="text" value="${esc(r.purpose)}"></label>
+          <label for="pn-receipt">Replace receipt (optional). Current: ${esc(r.receipt)}<input id="pn-receipt" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic"></label>
+          <div class="btns"><button type="button" data-panel-go>Resubmit for two signatures</button><button type="button" class="ghost" data-panel-close>Cancel</button></div>
+          <p class="msg" id="pn-msg" role="status"></p>`;
+      else if(pn==='paid')panelBody=`<strong>Mark as paid</strong>
+          <dl><dt>Club</dt><dd>${esc(C(r.club).name)}</dd><dt>Pay to</dt><dd>${esc(r.payee)}</dd><dt>Amount</dt><dd class="amt">${money(r.amount)}</dd></dl>
+          <div class="row">
+            <label for="pn-pdate">Payment date<input id="pn-pdate" type="date" value="${today()}"></label>
+            <label for="pn-check">Check number<input id="pn-check" type="text" inputmode="numeric"></label>
+          </div>
+          <div class="btns"><button type="button" data-panel-go>Mark as paid</button><button type="button" class="ghost" data-panel-close>Cancel</button></div>
+          <p class="msg" id="pn-msg" role="status"></p>`;
+      const panelRow=panelBody?`<tr class="confirm-row"><td colspan="10"><div class="confirm" role="group">${panelBody}</div></td></tr>`:'';
+      const reasonNote=(st==='Rejected'||st==='Returned')&&r.reason?`<div class="reason">${st} by ${esc(P(r.reasonBy).name)}: ${esc(r.reason)}</div>`:'';
+      const paidNote=st==='Paid'&&r.paid?`<div class="reason">Paid ${esc(r.paid.date)}, check ${esc(r.paid.check)}</div>`:'';
+      return `<tr>
+        <td class="amt">${esc(r.date)}</td>
+        <td>${esc(C(r.club).name)}</td>
+        <td>${esc(r.type)}</td>
+        <td>${esc(P(r.preparedBy).name)}<div class="small">${roleLabel[P(r.preparedBy).role]}</div></td>
+        <td>${esc(r.payee)}</td>
+        <td>${esc(r.purpose)}</td>
+        <td class="receipt">${esc(r.receipt)}</td>
+        <td class="num amt">${money(r.amount)}</td>
+        <td><span class="pill ${st.toLowerCase()}">${st}</span>${reasonNote}${paidNote}<div class="sigs">${r.sigs.length} of 2 signatures${r.sigs.map(s=>`<div>${esc(P(s).name)}${sigTime(r,s)?', '+sigTime(r,s):''}</div>`).join('')}</div></td>
+        ${showActions?`<td>${action}</td>`:''}
+      </tr>${confirmRow}${panelRow}`;}).join('');
+    return `<div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Club</th><th>Type</th><th>Requested by</th><th>Pay to</th><th>Purpose</th><th>Receipt</th><th class="num">Amount</th><th>Status</th>${showActions?'<th>Actions</th>':''}</tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  }
+  function depositTable(list){
+    if(!list.length)return '<p class="hint">No deposits yet.</p>';
+    return `<div class="table-wrap"><table style="min-width:520px">
+      <thead><tr><th>Date</th><th>Description</th><th>Recorded by</th><th class="num">Amount</th></tr></thead>
+      <tbody>${list.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(d=>`<tr><td class="amt">${esc(d.date)}</td><td>${esc(d.desc)}</td><td>${esc(P(d.by).name)}</td><td class="num amt">${money(d.amount)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function render(){
+    const me=P(current);const app=document.getElementById('app');
+    if(me.role==='booster'&&!me.signed){
+      app.innerHTML=`<div class="blocked"><h2>Access blocked</h2>
+        <p>${esc(me.name)} has not signed the Booster Foundation agreement, so this account cannot view balances, record deposits, or submit requests.</p>
+        <p class="small">Need access? Go to the Booster Foundation website and download the booster agreement. In this demo, the download link is a placeholder.</p></div>`;
+      return;
+    }
+    if(me.role==='booster'){
+      const c=C(me.club);
+      app.innerHTML=`
+        <section class="section"><div class="section-head"><h2>${esc(c.name)} balance</h2><p class="hint">Deposits minus approved requests</p></div>
+          <div class="grid">${clubCard(c)}</div></section>
+        <section class="forms">${depositForm(me)}${requestForm(me)}</section>
+        <section class="section"><div class="section-head"><h2>Your club’s requests</h2><p class="hint">Each request needs two Booster Foundation signatures</p></div>
+          <p class="msg" id="reg-msg" role="status"></p>
+          ${requestTable(state.requests.filter(r=>r.club===me.club),me)}</section>
+        <section class="section"><h2>Your club’s deposits</h2>${depositTable(state.deposits.filter(d=>d.club===me.club))}</section>`;
+    }else{
+      const pending=state.requests.filter(r=>status(r)==='Pending').length;
+      app.innerHTML=`
+        <section class="section"><div class="section-head"><h2>All club balances</h2><p class="hint">${clubs.filter(c=>balance(c.id)<0).length} negative &middot; ${pending} request${pending===1?'':'s'} awaiting signatures</p></div>
+          <div class="grid">${clubs.map(clubCard).join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>Request register</h2><p class="hint">${canPrepare(me)?'You can prepare and sign requests. You cannot sign one you prepared.':'You can sign requests. Board members do not prepare requests.'}</p></div>
+          <p class="msg" id="reg-msg" role="status"></p>
+          ${requestTable(state.requests,me)}</section>
+        ${canPrepare(me)?`<section class="forms">${requestForm(me)}</section>`:''}`;
+    }
+    bind(me);
+    const rm=document.getElementById('reg-msg');
+    if(rm&&flash){rm.className='msg '+flash.kind;rm.textContent=flash.text}
+    flash=null;
+  }
+
+  function bind(me){
+    document.querySelectorAll('[data-sign]').forEach(btn=>btn.addEventListener('click',()=>{
+      confirming=btn.dataset.sign;panel=null;render();
+      const c=document.querySelector('[data-confirm-sign]');if(c)c.focus();
+    }));
+    document.querySelectorAll('[data-cancel-sign]').forEach(btn=>btn.addEventListener('click',()=>{confirming=null;render()}));
+    document.querySelectorAll('[data-confirm-sign]').forEach(btn=>btn.addEventListener('click',()=>{
+      const r=state.requests.find(x=>x.id===btn.dataset.confirmSign);confirming=null;
+      if(!r||r.preparedBy===me.id||r.sigs.includes(me.id)||status(r)!=='Pending'){render();return}
+      r.sigs.push(me.id);r.sigAt=r.sigAt||{};r.sigAt[me.id]=new Date().toISOString();save();flash={kind:'ok',text:'Signature recorded.'};render();
+    }));
+    document.querySelectorAll('[data-panel]').forEach(btn=>btn.addEventListener('click',()=>{
+      const [kind,id]=btn.dataset.panel.split(':');panel={kind,id};confirming=null;render();
+      const f=document.querySelector('#pn-reason,#pn-type,#pn-check,[data-panel-go]');if(f)f.focus();
+    }));
+    document.querySelectorAll('[data-panel-close]').forEach(btn=>btn.addEventListener('click',()=>{panel=null;render()}));
+    document.querySelectorAll('[data-panel-go]').forEach(btn=>btn.addEventListener('click',()=>{
+      if(!panel)return;const r=state.requests.find(x=>x.id===panel.id);const kind=panel.kind;
+      const msg=document.getElementById('pn-msg');
+      if(!r){panel=null;render();return}
+      if(kind==='reject'||kind==='return'){
+        if(!canSign(me)||r.preparedBy===me.id||status(r)!=='Pending'){panel=null;render();return}
+        const reason=document.getElementById('pn-reason').value.trim();
+        if(!reason){msg.className='msg err';msg.textContent='Enter a reason so the requester knows what to do next.';return}
+        r.state=kind==='reject'?'Rejected':'Returned';r.reason=reason;r.reasonBy=me.id;
+        flash={kind:'ok',text:kind==='reject'?'Request rejected.':'Request returned to the requester.'};
+      }else if(kind==='cancel'){
+        if(r.preparedBy!==me.id||status(r)!=='Pending'){panel=null;render();return}
+        r.state='Cancelled';flash={kind:'ok',text:'Request cancelled.'};
+      }else if(kind==='paid'){
+        if(!canPrepare(me)||status(r)!=='Approved'){panel=null;render();return}
+        const date=document.getElementById('pn-pdate').value;
+        const check=document.getElementById('pn-check').value.trim();
+        const err=[];
+        if(!date)err.push('Choose the payment date.');
+        if(!check)err.push('Enter the check number.');
+        if(err.length){msg.className='msg err';msg.textContent=err.join(' ');return}
+        r.state='Paid';r.paid={date,check,by:me.id};
+        flash={kind:'ok',text:'Request marked as paid.'};
+      }else if(kind==='edit'){
+        if(r.preparedBy!==me.id||status(r)!=='Returned'){panel=null;render();return}
+        const amount=parseFloat(document.getElementById('pn-amount').value);
+        const payee=document.getElementById('pn-payee').value.trim();
+        const purpose=document.getElementById('pn-purpose').value.trim();
+        const file=document.getElementById('pn-receipt').files[0];
+        const err=[];
+        if(!(amount>0))err.push('Enter an amount greater than $0.');
+        if(!payee)err.push('Enter who should be paid.');
+        if(!purpose)err.push('Describe what the money is for.');
+        if(err.length){msg.className='msg err';msg.textContent=err.join(' ');return}
+        r.type=document.getElementById('pn-type').value;r.amount=Math.round(amount*100)/100;r.payee=payee;r.purpose=purpose;
+        if(file)r.receipt=file.name;
+        delete r.state;delete r.reason;delete r.reasonBy;r.sigs=[];r.sigAt={};
+        flash={kind:'ok',text:'Request resubmitted. It needs two signatures.'};
+      }
+      panel=null;save();render();
+    }));
+    document.querySelectorAll('[data-withdraw]').forEach(btn=>btn.addEventListener('click',()=>{
+      const r=state.requests.find(x=>x.id===btn.dataset.withdraw);
+      if(!r||status(r)!=='Pending'||!r.sigs.includes(me.id))return;
+      r.sigs=r.sigs.filter(s=>s!==me.id);if(r.sigAt)delete r.sigAt[me.id];save();flash={kind:'ok',text:'Signature withdrawn.'};render();
+    }));
+    const rf=document.getElementById('rq-form');
+    if(rf)rf.addEventListener('submit',e=>{
+      e.preventDefault();const msg=document.getElementById('rq-msg');
+      const amount=parseFloat(document.getElementById('rq-amount').value);
+      const payee=document.getElementById('rq-payee').value.trim();
+      const purpose=document.getElementById('rq-purpose').value.trim();
+      const file=document.getElementById('rq-receipt').files[0];
+      const err=[];
+      if(!(amount>0))err.push('Enter an amount greater than $0.');
+      if(!payee)err.push('Enter who should be paid.');
+      if(!purpose)err.push('Describe what the money is for.');
+      if(!file)err.push('Attach a receipt or proof of purchase. A picture on your phone of the receipt is sufficient.');
+      if(err.length){msg.className='msg err';msg.textContent=err.join(' ');return}
+      state.requests.push({id:'r'+(++state.seq),club:document.getElementById('rq-club').value,type:document.getElementById('rq-type').value,payee,amount:Math.round(amount*100)/100,purpose,receipt:file.name,preparedBy:me.id,sigs:[],date:today()});
+      save();render();
+      const m=document.getElementById('rq-msg');if(m){m.className='msg ok';m.textContent='Request submitted. It needs two signatures.'}
+    });
+    const df=document.getElementById('dp-form');
+    if(df)df.addEventListener('submit',e=>{
+      e.preventDefault();const msg=document.getElementById('dp-msg');
+      const amount=parseFloat(document.getElementById('dp-amount').value);
+      const desc=document.getElementById('dp-desc').value.trim();
+      const date=document.getElementById('dp-date').value;
+      const err=[];
+      if(!(amount>0))err.push('Enter an amount greater than $0.');
+      if(!desc)err.push('Add a description.');
+      if(!date)err.push('Choose a date.');
+      if(err.length){msg.className='msg err';msg.textContent=err.join(' ');return}
+      state.deposits.push({id:'d'+(++state.seq),club:me.club,date,amount:Math.round(amount*100)/100,desc,by:me.id});
+      save();render();
+      const m=document.getElementById('dp-msg');if(m){m.className='msg ok';m.textContent='Deposit recorded.'}
+    });
+  }
+  render();
+})();
+</script>
+</body>
+</html>
